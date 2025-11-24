@@ -51,6 +51,7 @@ func Init(level config.LogLevel, logFilePath string) error {
 				return
 			}
 			logWriter = logFile
+			os.Stderr = logFile
 		} else {
 			// If no log file is specified, use a null writer for debug/trace logs
 			logWriter = io.Discard

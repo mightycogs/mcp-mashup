@@ -153,6 +153,25 @@ Now in Cursor config you may leave the only one MCP server - aggregator. The con
 - `MCP_PROTOCOL_VERSION`: Force a specific protocol version for compatibility
 - `MCP_CURSOR_MODE`: Enable Cursor-specific compatibility adjustments
 
+## Use cases
+
+### Unified MCP config for multiple clients
+
+One practical use case is to maintain a **single MCP configuration file** that is shared across different MCP-capable clients (e.g. Cursor, Windsurf, Gemini-CLI, Codex, Claude Code, GitHub Copilot agents, etc.).
+
+Instead of configuring each client with its own list of MCP servers and duplicating secrets, you:
+
+- Configure all backend MCP servers (and their secrets) **once** in the aggregator config.
+- Point each client to the **same** `combine-mcp` binary with the same `MCP_CONFIG` file.
+- Let the aggregator handle prefixing, filtering and normalization of tools for every client.
+
+This has a few benefits:
+
+- **Single source of truth** for which MCP servers and tools are available.
+- **Centralized secret management** – API tokens and other credentials live only in the aggregator config.
+- **Consistent behaviour** across different IDEs/agents without per-client MCP reconfiguration.
+- **Secrets isolation** – no need to share secrets with AI agent tools directly.
+
 ## Tool Name Sanitization
 
 The MCP Aggregator automatically sanitizes tool names by replacing dashes with underscores. This is necessary because Cursor has a known issue where it cannot properly detect or use tools with dashes in their names.

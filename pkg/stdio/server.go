@@ -24,19 +24,19 @@ func NewAggregatorServer(serverName, version string, aggregator *aggregator.MCPA
 	// Add debug hooks
 	hooks := &server.Hooks{}
 
-	hooks.AddBeforeAny(func(id any, method mcp.MCPMethod, message any) {
+	hooks.AddBeforeAny(func(ctx context.Context, id any, method mcp.MCPMethod, message any) {
 		logger.Debug("Before method: %s, id: %v", method, id)
 	})
 
-	hooks.AddOnSuccess(func(id any, method mcp.MCPMethod, message any, result any) {
+	hooks.AddOnSuccess(func(ctx context.Context, id any, method mcp.MCPMethod, message any, result any) {
 		logger.Debug("Success method: %s, id: %v", method, id)
 	})
 
-	hooks.AddOnError(func(id any, method mcp.MCPMethod, message any, err error) {
+	hooks.AddOnError(func(ctx context.Context, id any, method mcp.MCPMethod, message any, err error) {
 		logger.Error("Error in method: %s, id: %v, error: %v", method, id, err)
 	})
 
-	hooks.AddBeforeInitialize(func(id any, message *mcp.InitializeRequest) {
+	hooks.AddBeforeInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest) {
 		logger.Info("Initialize request from: %s %s", message.Params.ClientInfo.Name, message.Params.ClientInfo.Version)
 		logger.Debug("Initialize params: %+v", message.Params)
 
@@ -47,7 +47,7 @@ func NewAggregatorServer(serverName, version string, aggregator *aggregator.MCPA
 		}
 	})
 
-	hooks.AddAfterInitialize(func(id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
+	hooks.AddAfterInitialize(func(ctx context.Context, id any, message *mcp.InitializeRequest, result *mcp.InitializeResult) {
 		logger.Info("Initialize response: server %s %s", result.ServerInfo.Name, result.ServerInfo.Version)
 
 		// Check if we're in Cursor mode
@@ -62,12 +62,12 @@ func NewAggregatorServer(serverName, version string, aggregator *aggregator.MCPA
 		}
 	})
 
-	hooks.AddBeforeCallTool(func(id any, message *mcp.CallToolRequest) {
+	hooks.AddBeforeCallTool(func(ctx context.Context, id any, message *mcp.CallToolRequest) {
 		logger.Info("Tool call: %s, id: %v", message.Params.Name, id)
 		logger.Debug("Tool arguments: %+v", message.Params.Arguments)
 	})
 
-	hooks.AddAfterCallTool(func(id any, message *mcp.CallToolRequest, result *mcp.CallToolResult) {
+	hooks.AddAfterCallTool(func(ctx context.Context, id any, message *mcp.CallToolRequest, result *mcp.CallToolResult) {
 		logger.Info("Tool call result: %s, success: %v", message.Params.Name, !result.IsError)
 	})
 
@@ -109,7 +109,6 @@ func (s *AggregatorServer) RegisterTools() error {
 // createToolHandler creates a handler function for a specific tool
 func (s *AggregatorServer) createToolHandler(toolName string) server.ToolHandlerFunc {
 	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		// Forward the call to the aggregator
 		logger.Debug("Handling tool call: %s", toolName)
 		result, err := s.aggregator.CallTool(ctx, request)
 		if err != nil {
