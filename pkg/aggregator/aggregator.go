@@ -2,7 +2,9 @@ package aggregator
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -84,7 +86,7 @@ func (a *MCPAggregator) Initialize(ctx context.Context, cfg *config.Config) erro
 		for {
 			n, err := r.Read(buffer)
 			if err != nil {
-				if err != os.ErrClosed {
+				if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
 					logger.Error("Error reading subprocess output: %v", err)
 				}
 				break
