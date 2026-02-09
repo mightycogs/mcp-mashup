@@ -42,7 +42,7 @@ Optional environment variables:
 |---|---|---|
 | `MCP_CONFIG` | Path to the configuration file (required) | — |
 | `MCP_LOG_LEVEL` | Logging level: `error`, `info`, `debug`, `trace` | `info` |
-| `MCP_LOG_FILE` | Path to a log file | stderr |
+| `MCP_LOG_FILE` | Path to a log file. Without it, logs go to stderr | stderr |
 
 ### Configuring mcp-mashup itself
 
@@ -75,6 +75,8 @@ In other words, the structure is nested: your client's `mcpServers` points to mc
 ```
 
 The optional `tools.allowed` array restricts which tools are exposed from a given server. If omitted, all tools from that server are available.
+
+_**NOTE:** `tools.allowed` is a custom construct specific to mcp-mashup and is not part of the MCP standard_
 
 Tool names from backend servers are automatically prefixed with the server name and dashes are replaced with underscores. For example, a tool `create-pr` from server `github` becomes `github_create_pr` in the client.
 
