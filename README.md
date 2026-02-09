@@ -3,7 +3,9 @@
 <img src="docs/small_create_with_ai.png" style="float: left; margin: 0 15px 15px 0;" width="150">
 
 
-MCP (Model Context Protocol) aggregator that combines multiple MCP servers into a single stdio interface. An MCP client connects to mcp-mashup as if it were a single server, while mcp-mashup spawns and manages multiple backend MCP servers behind the scenes. Only the stdio transport is supported.
+MCP (Model Context Protocol) aggregator that combines multiple MCP servers into a single stdio interface. An MCP client connects to mcp-mashup as if it were a single server, while mcp-mashup spawns and manages multiple backend MCP servers behind the scenes. 
+
+_Only the stdio transport is supported. The goal of mcp-mashup is purely logical aggregation — it is not intended to extend available protocols, secure access, or abstract away the complexity of the underlying MCP servers. For those capabilities, consider other solutions._
 
 ## Build, test, install
 
