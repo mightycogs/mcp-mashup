@@ -83,7 +83,7 @@ The optional `tools.prefixed` array controls which tools keep the server-name pr
 
 _**NOTE:** `tools.allowed` and `tools.prefixed` are custom constructs specific to mcp-mashup and are not part of the MCP standard_
 
-Tool names from backend servers are automatically prefixed with the server name and dashes are replaced with underscores. For example, a tool `create-pr` from server `github` becomes `github_create_pr` in the client.
+By default, tool names from backend servers are automatically prefixed with the server name and dashes are replaced with underscores. For example, a tool `create-pr` from server `github` becomes `github_create_pr` in the client. Use `tools.prefixed` to override this behavior for specific servers.
 
 ## Origin and authorship
 
