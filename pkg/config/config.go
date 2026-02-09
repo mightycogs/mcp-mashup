@@ -53,9 +53,9 @@ type Config struct {
 
 // rawConfig is used to parse different config formats
 type rawConfig struct {
-	// Array format
+	// Deprecated: use mcpServers object format instead
 	Servers []ServerConfig `json:"servers"`
-	// Object format
+	// Object format (standard, compatible with Cursor/Claude Code/Windsurf)
 	MCPServers map[string]struct {
 		Command string            `json:"command"`
 		Args    []string          `json:"args,omitempty"`
@@ -127,7 +127,7 @@ func LoadConfig(envVar string) (*Config, error) {
 	config.LogLevel = GetLogLevel()
 	config.LogFile = GetLogFile()
 
-	// Check if we have servers in the array format
+	// Deprecated: array format support will be removed in a future version
 	if len(raw.Servers) > 0 {
 		config.Servers = raw.Servers
 	} else if len(raw.MCPServers) > 0 {

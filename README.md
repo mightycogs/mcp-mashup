@@ -1,142 +1,30 @@
-# MCP Aggregator
+# mcp-mashup
 
-An MCP (Model Context Protocol) aggregator that allows you to combine multiple MCP servers into a single interface. The code is mostly AI-generated.
+MCP (Model Context Protocol) aggregator that combines multiple MCP servers into a single stdio interface. An MCP client connects to mcp-mashup as if it were a single server, while mcp-mashup spawns and manages multiple backend MCP servers behind the scenes.
 
-## Why combine MCP servers into one?
+This is useful when a client needs access to tools from several MCP servers simultaneously without configuring each one separately. Tool names from backend servers are automatically prefixed with the server name (e.g. `github_create_pr`) and dashes are replaced with underscores to ensure broad client compatibility.
 
-The primary reason for this app was to work around Cursor's limitation of only being able to use 2 MCP servers at a time. No matter which, in my case when I added 3rd MCP server, it was breaking the ability to use one of other two.
+## Build, test, install
 
-## Overview
+Requires Go 1.24+.
 
-The MCP Aggregator acts as a bridge between Cursor (or any other MCP client) and multiple MCP servers. It functions both as an MCP server (when talking to Cursor) and as an MCP client (when talking to backend MCP servers).
-
-Key features:
-- Provides a stdio interface for Cursor and other MCP clients
-- Connects to multiple backend MCP servers
-- Prefixes methods from backend servers (e.g., "shortcut_search_stories" for "search_stories" method from a "shortcut" MCP)
-- Automatically sanitizes tool names by replacing dashes with underscores for Cursor compatibility
-- Configurable via environment variables and JSON config file
-- Debug logging with configurable levels
-
-## Installation
-
-### Using install script (recommended)
-
-You can install the latest version of combine-mcp using our installation script:
-
-```bash
-# Download and run the installation script
-curl -fsSL https://raw.githubusercontent.com/nazar256/combine-mcp/main/install.sh | bash
-
-# Or install a specific version
-curl -fsSL https://raw.githubusercontent.com/nazar256/combine-mcp/main/install.sh | bash -s -- -v v1.0.0
+```
+make build     # build the binary
+make test      # run tests
+make install   # install to ~/.local/bin
 ```
 
-The script will:
-- Detect your operating system and architecture
-- Download the appropriate pre-compiled binary
-- Verify the checksum
-- Install it to a suitable location in your PATH
-- Make it executable
+Run `make` without arguments to see all available targets.
 
-### Using go install (alternative)
+## Defining mcp-mashup as an MCP server in your client
 
-```bash
-# Install directly from GitHub (binary will be placed in $GOPATH/bin)
-go install github.com/nazar256/combine-mcp/cmd/combine-mcp@latest
-
-# Ensure $GOPATH/bin is in your PATH
-# For example, add this to your .bashrc or .zshrc:
-# export PATH=$PATH:$(go env GOPATH)/bin
-```
-
-### Using Docker (alternative)
-
-You can run combine-mcp directly using Docker without installing it locally:
-
-```bash
-# Run the latest version
-docker run --rm -v ~/.config/mcp:/config ghcr.io/nazar256/combine-mcp:latest
-
-# Run a specific version
-docker run --rm -v ~/.config/mcp:/config ghcr.io/nazar256/combine-mcp:v1.0.0
-
-# Set environment variables
-docker run --rm -v ~/.config/mcp:/config -e MCP_CONFIG=/config/config.json -e MCP_LOG_LEVEL=debug ghcr.io/nazar256/combine-mcp:latest
-```
-
-To use it with Cursor, you'd need to configure the MCP server to use Docker:
+Configure your MCP client (Cursor, Claude Code, Windsurf, etc.) to use mcp-mashup as a server. The `MCP_CONFIG` environment variable must point to the mcp-mashup configuration file (described in the next section).
 
 ```json
 {
   "mcpServers": {
-    "aggregator": {
-      "command": "docker",
-      "args": ["run", "--rm", "-v", "~/.config/mcp:/config", "ghcr.io/nazar256/combine-mcp:latest"],
-      "env": {
-        "MCP_CONFIG": "/config/config.json"
-      }
-    }
-  }
-}
-```
-
-### Using the Makefile
-
-The project includes a Makefile for common tasks:
-
-```bash
-# Build the binary
-make build
-
-# Run tests
-make test
-
-# Clean up build artifacts
-make clean
-```
-
-## Usage
-
-### Configure the aggregator
-
-Basically you can copy existing Cursor MCP config to a location of your choice, let's say `~/.config/mcp/config.json`. It should look like this:
-
-Nice feature for Cursor users is filtering tools from MCP servers. You can manage tools to not reach the limit of 40 tools in Cursor and not expose the ones you don't want Cursor to use.
-
-```json
-{
-  "mcpServers": {
-    "shortcut": {
-      "command": "npx",
-      "args": ["-y", "@shortcut/mcp"],
-      "env": {
-        "SHORTCUT_API_TOKEN": "your-shortcut-api-token-here"
-      },
-      "tools": {
-        "allowed": ["search-stories", "get-story", "create-story"]
-      }
-    },
-    "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_TOKEN": "your-github-token-here"  
-      }
-    }
-  }
-}
-```
-
-### Configure the aggregator in Cursor
-
-Now in Cursor config you may leave the only one MCP server - aggregator. The config may look like this (assuming you have `combine-mcp` binary is instlaled your PATH and you have `~/.config/mcp/config.json` file):
-
-```json
-{
-  "mcpServers": {
-    "aggregator": {
-      "command": "combine-mcp",
+    "mashup": {
+      "command": "mcp-mashup",
       "env": {
         "MCP_CONFIG": "~/.config/mcp/config.json"
       }
@@ -145,87 +33,46 @@ Now in Cursor config you may leave the only one MCP server - aggregator. The con
 }
 ```
 
-### Environment Variables
+Optional environment variables:
 
-- `MCP_CONFIG`: Path to the configuration file (required)
-- `MCP_LOG_LEVEL`: Logging level (error, info, debug, trace) - default: info
-- `MCP_LOG_FILE`: Path to the log file
-- `MCP_PROTOCOL_VERSION`: Force a specific protocol version for compatibility
-- `MCP_CURSOR_MODE`: Enable Cursor-specific compatibility adjustments
+| Variable | Description | Default |
+|---|---|---|
+| `MCP_CONFIG` | Path to the configuration file (required) | — |
+| `MCP_LOG_LEVEL` | Logging level: `error`, `info`, `debug`, `trace` | `info` |
+| `MCP_LOG_FILE` | Path to a log file | stderr |
 
-## Use cases
+## Configuring mcp-mashup itself
 
-### Unified MCP config for multiple clients
+The configuration file referenced by `MCP_CONFIG` is itself an `mcpServers` definition — the same format your client uses. This is intentional: mcp-mashup acts as a client to these backend servers, so the configuration mirrors what any MCP client expects.
 
-One practical use case is to maintain a **single MCP configuration file** that is shared across different MCP-capable clients (e.g. Cursor, Windsurf, Gemini-CLI, Codex, Claude Code, GitHub Copilot agents, etc.).
-
-Instead of configuring each client with its own list of MCP servers and duplicating secrets, you:
-
-- Configure all backend MCP servers (and their secrets) **once** in the aggregator config.
-- Point each client to the **same** `combine-mcp` binary with the same `MCP_CONFIG` file.
-- Let the aggregator handle prefixing, filtering and normalization of tools for every client.
-
-This has a few benefits:
-
-- **Single source of truth** for which MCP servers and tools are available.
-- **Centralized secret management** – API tokens and other credentials live only in the aggregator config.
-- **Consistent behaviour** across different IDEs/agents without per-client MCP reconfiguration.
-- **Secrets isolation** – no need to share secrets with AI agent tools directly.
-
-## Tool Name Sanitization
-
-The MCP Aggregator automatically sanitizes tool names by replacing dashes with underscores. This is necessary because Cursor has a known issue where it cannot properly detect or use tools with dashes in their names.
-
-For example:
-- Original tool name: `get-user`
-- Sanitized tool name: `get_user`
-- Prefixed tool name (for shortcut server): `shortcut_get_user`
-
-The sanitization is transparent - when you call a tool using the sanitized name, the aggregator maps it back to the original name when forwarding the request to the backend server.
-
-### Tool Filtering
-
-The MCP Aggregator supports optional tool filtering per server. This is useful when you want to:
-- Limit the number of exposed tools to stay within Cursor's tool limit (40 tools maximum)
-- Only expose specific tools from each server
-- Avoid tool name conflicts between servers
-- Improve performance by reducing the number of tools to process
-
-To enable tool filtering, add a `tools` object to your server configuration with an `allowed` array listing the tools you want to expose:
+In other words, the structure is nested: your client's `mcpServers` points to mcp-mashup, and mcp-mashup's own config contains another `mcpServers` block pointing to the actual backend servers.
 
 ```json
 {
   "mcpServers": {
-    "shortcut": {
-      "command": "npx",
-      "args": ["-y", "@shortcut/mcp"],
-      "env": {
-        "SHORTCUT_API_TOKEN": "your-shortcut-api-token-here"
-      },
-      "tools": {
-        "allowed": [
-          "search-stories",
-          "get-story",
-          "create-story",
-          "assign-current-user-as-owner"
-        ]
-      }
-    },
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
       "env": {
-        "GITHUB_TOKEN": "your-github-token-here"
+        "GITHUB_TOKEN": "your-token"
+      }
+    },
+    "shortcut": {
+      "command": "npx",
+      "args": ["-y", "@shortcut/mcp"],
+      "env": {
+        "SHORTCUT_API_TOKEN": "your-token"
       },
       "tools": {
-        "allowed": [
-          "create-pr",
-          "list-prs",
-          "get-pr",
-          "merge-pr"
-        ]
+        "allowed": ["search-stories", "get-story", "create-story"]
       }
     }
   }
 }
 ```
+
+The optional `tools.allowed` array restricts which tools are exposed from a given server. If omitted, all tools from that server are available.
+
+## Origin and authorship
+
+This project is a fork of [combine-mcp](https://github.com/nazar256/combine-mcp) by Yurii Nazarenko. The original repository does not specify a license. This fork adapts the software for internal use at [mightycogs](https://github.com/mightycogs) — no additional licensing terms are introduced.
