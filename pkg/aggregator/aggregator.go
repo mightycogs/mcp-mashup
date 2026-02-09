@@ -13,8 +13,8 @@ import (
 
 	"github.com/mark3labs/mcp-go/client"
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/nazar256/combine-mcp/pkg/config"
-	"github.com/nazar256/combine-mcp/pkg/logger"
+	"github.com/mightycogs/mcp-mashup/pkg/config"
+	"github.com/mightycogs/mcp-mashup/pkg/logger"
 )
 
 // MCPClient is an interface that matches the methods we use from StdioMCPClient

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/nazar256/combine-mcp/pkg/config"
+	"github.com/mightycogs/mcp-mashup/pkg/config"
 )
 
 func TestSanitizeToolName(t *testing.T) {

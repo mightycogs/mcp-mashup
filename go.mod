@@ -1,4 +1,4 @@
-module github.com/nazar256/combine-mcp
+module github.com/mightycogs/mcp-mashup
 
 go 1.24.1
 
