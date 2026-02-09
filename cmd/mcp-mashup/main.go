@@ -18,7 +18,7 @@ const (
 	// Version is the version of the MCP aggregator
 	Version = "1.0.0"
 	// Name is the name of the MCP aggregator
-	Name = "mcp-aggregator"
+	Name = "mcp-mashup"
 )
 
 func main() {

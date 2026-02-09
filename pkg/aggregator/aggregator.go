@@ -144,7 +144,7 @@ func (a *MCPAggregator) Initialize(ctx context.Context, cfg *config.Config) erro
 		initRequest := mcp.InitializeRequest{}
 		initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 		initRequest.Params.ClientInfo = mcp.Implementation{
-			Name:    "mcp-aggregator",
+			Name:    "mcp-mashup",
 			Version: "1.0.0",
 		}
 
