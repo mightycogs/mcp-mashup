@@ -69,7 +69,8 @@ In other words, the structure is nested: your client's `mcpServers` points to mc
         "SHORTCUT_API_TOKEN": "your-token"
       },
       "tools": {
-        "allowed": ["search-stories", "get-story", "create-story"]
+        "allowed": ["search-stories", "get-story", "create-story"],
+        "prefixed": ["search-stories"]
       }
     }
   }
