@@ -137,7 +137,7 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 	logger.Debug("Found %d tools for server %s", len(toolsResp.Tools), serverName)
 
 	allowedTools := make(map[string]bool)
-	if serverConfig != nil && serverConfig.Tools != nil {
+	if serverConfig != nil && serverConfig.Tools != nil && serverConfig.Tools.Allowed != nil {
 		logger.Debug("Tool filtering enabled for server %s", serverName)
 		for _, tool := range serverConfig.Tools.Allowed {
 			normalizedName := sanitizeName(tool)
@@ -150,6 +150,16 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 		}
 	} else {
 		logger.Debug("No tool filtering configured for server %s", serverName)
+	}
+
+	prefixAll := true
+	prefixedTools := make(map[string]bool)
+	if serverConfig != nil && serverConfig.Tools != nil && serverConfig.Tools.Prefixed != nil {
+		prefixAll = false
+		for _, tool := range *serverConfig.Tools.Prefixed {
+			prefixedTools[sanitizeName(tool)] = true
+		}
+		logger.Debug("Selective prefixing for server %s: %d tools prefixed", serverName, len(prefixedTools))
 	}
 
 	a.mu.Lock()
@@ -168,11 +178,19 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 
 		originalName := tool.Name
 		sanitizedName := sanitizeName(originalName)
-		prefixedName := fmt.Sprintf("%s_%s", sanitizedServerName, sanitizedName)
 
-		logger.Debug("Registering tool: %s -> %s (sanitized from: %s)", originalName, prefixedName, tool.Name)
+		shouldPrefix := prefixAll || prefixedTools[sanitizedName]
 
-		a.tools[prefixedName] = toolMapping{
+		var registeredName string
+		if shouldPrefix {
+			registeredName = fmt.Sprintf("%s_%s", sanitizedServerName, sanitizedName)
+		} else {
+			registeredName = sanitizedName
+		}
+
+		logger.Debug("Registering tool: %s -> %s (prefixed: %v)", originalName, registeredName, shouldPrefix)
+
+		a.tools[registeredName] = toolMapping{
 			serverName:    serverName,
 			originalName:  originalName,
 			sanitizedName: sanitizedName,

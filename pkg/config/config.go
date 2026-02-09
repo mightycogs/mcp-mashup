@@ -32,7 +32,8 @@ const (
 
 // ToolsConfig represents the tool filtering configuration for a server
 type ToolsConfig struct {
-	Allowed []string `json:"allowed,omitempty"`
+	Allowed  []string  `json:"allowed,omitempty"`
+	Prefixed *[]string `json:"prefixed,omitempty"`
 }
 
 // ServerConfig represents the configuration for a single MCP server

@@ -172,6 +172,66 @@ func TestToolFiltering(t *testing.T) {
 			},
 			wantToolNames: []string{"test_server_tool1"},
 		},
+		{
+			name: "Prefixed nil prefixes all tools (default)",
+			serverConfig: config.ServerConfig{
+				Name:    "test-server",
+				Command: "test-command",
+				Tools:   &config.ToolsConfig{},
+			},
+			serverTools: []mcp.Tool{
+				{Name: "tool1", Description: "Tool 1"},
+				{Name: "tool2", Description: "Tool 2"},
+			},
+			wantToolNames: []string{"test_server_tool1", "test_server_tool2"},
+		},
+		{
+			name: "Prefixed empty array prefixes no tools",
+			serverConfig: config.ServerConfig{
+				Name:    "test-server",
+				Command: "test-command",
+				Tools: &config.ToolsConfig{
+					Prefixed: &[]string{},
+				},
+			},
+			serverTools: []mcp.Tool{
+				{Name: "tool1", Description: "Tool 1"},
+				{Name: "tool2", Description: "Tool 2"},
+			},
+			wantToolNames: []string{"tool1", "tool2"},
+		},
+		{
+			name: "Prefixed with specific tools",
+			serverConfig: config.ServerConfig{
+				Name:    "test-server",
+				Command: "test-command",
+				Tools: &config.ToolsConfig{
+					Prefixed: &[]string{"tool1"},
+				},
+			},
+			serverTools: []mcp.Tool{
+				{Name: "tool1", Description: "Tool 1"},
+				{Name: "tool2", Description: "Tool 2"},
+			},
+			wantToolNames: []string{"test_server_tool1", "tool2"},
+		},
+		{
+			name: "Prefixed combined with allowed",
+			serverConfig: config.ServerConfig{
+				Name:    "test-server",
+				Command: "test-command",
+				Tools: &config.ToolsConfig{
+					Allowed:  []string{"tool1", "tool2"},
+					Prefixed: &[]string{"tool1"},
+				},
+			},
+			serverTools: []mcp.Tool{
+				{Name: "tool1", Description: "Tool 1"},
+				{Name: "tool2", Description: "Tool 2"},
+				{Name: "tool3", Description: "Tool 3"},
+			},
+			wantToolNames: []string{"test_server_tool1", "tool2"},
+		},
 	}
 
 	for _, tt := range tests {

@@ -78,7 +78,9 @@ In other words, the structure is nested: your client's `mcpServers` points to mc
 
 The optional `tools.allowed` array restricts which tools are exposed from a given server. If omitted, all tools from that server are available.
 
-_**NOTE:** `tools.allowed` is a custom construct specific to mcp-mashup and is not part of the MCP standard_
+The optional `tools.prefixed` array controls which tools keep the server-name prefix. If omitted, all tools are prefixed (default behavior). If set to an empty array `[]`, no tools are prefixed — they keep their original names (with dashes replaced by underscores). If specific tool names are listed, only those tools are prefixed while the rest are exposed with their original names.
+
+_**NOTE:** `tools.allowed` and `tools.prefixed` are custom constructs specific to mcp-mashup and are not part of the MCP standard_
 
 Tool names from backend servers are automatically prefixed with the server name and dashes are replaced with underscores. For example, a tool `create-pr` from server `github` becomes `github_create_pr` in the client.
 
