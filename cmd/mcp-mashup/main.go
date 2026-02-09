@@ -17,8 +17,26 @@ import (
 var version = "dev"
 
 func main() {
-	// SET UP STDOUT REDIRECTION FIRST - before anything else!
-	// We need to capture ALL stdout output and redirect it
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "--version":
+			fmt.Println(version)
+			os.Exit(0)
+		case "--help", "-h":
+			fmt.Printf(`mcp-mashup %s — MCP server aggregator (stdio)
+
+Environment variables:
+  MCP_CONFIG      Path to mcpServers JSON config file (required)
+  MCP_LOG_LEVEL   Logging level: error, info, debug, trace (default: info)
+  MCP_LOG_FILE    Path to a log file (default: stderr)
+
+Usage:
+  MCP_CONFIG=~/.config/mcp/config.json mcp-mashup
+`, version)
+			os.Exit(0)
+		}
+	}
+
 
 	// Create a pipe for capturing stdout
 	stdoutReader, stdoutWriter, err := os.Pipe()
