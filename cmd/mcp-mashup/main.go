@@ -14,12 +14,7 @@ import (
 	"github.com/mightycogs/mcp-mashup/pkg/stdio"
 )
 
-const (
-	// Version is the version of the MCP aggregator
-	Version = "1.0.0"
-	// Name is the name of the MCP aggregator
-	Name = "mcp-mashup"
-)
+var version = "dev"
 
 func main() {
 	// SET UP STDOUT REDIRECTION FIRST - before anything else!
@@ -93,22 +88,19 @@ func main() {
 	}
 	defer logger.Close()
 
-	// Log startup message to file only
-	logger.Info("Starting MCP Aggregator v%s", Version)
+	logger.Info("Starting MCP Aggregator v%s", version)
 	logger.Debug("Configuration loaded: %d servers configured", len(cfg.Servers))
 
-	// Only print startup messages to stderr, never stdout
-	fmt.Fprintf(os.Stderr, "Starting MCP Aggregator v%s\n", Version)
+	fmt.Fprintf(os.Stderr, "Starting MCP Aggregator v%s\n", version)
 
-	// Create and initialize the aggregator
+	aggregator.Version = version
 	agg := aggregator.NewMCPAggregator()
 	if err := agg.Initialize(ctx, cfg); err != nil {
 		logger.Fatal("Error initializing aggregator: %v", err)
 	}
 	defer agg.Close()
 
-	// Create the MCP server
-	server := stdio.NewAggregatorServer(Name, Version, agg)
+	server := stdio.NewAggregatorServer("mcp-mashup", version, agg)
 
 	// Register tools from the aggregator
 	if err := server.RegisterTools(); err != nil {

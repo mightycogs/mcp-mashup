@@ -4,11 +4,7 @@
 *.dll
 *.so
 *.dylib
-main
 /bin/
-test_shortcut
-test_*
-!test_cursor.sh
 
 # Sensitive files
 *.pem
@@ -31,9 +27,6 @@ logs/
 vendor/
 go.work
 
-# macOS specific
-.DS_Store
-
 # Testing and debugging files
 tmp/
 **/coverage.out
@@ -51,4 +44,4 @@ mcp-go/
 
 # Local development scripts not needed in the public repo
 run_debug.sh
-*_restart.sh 
+*_restart.sh

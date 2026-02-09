@@ -8,7 +8,7 @@ import (
 	"github.com/mightycogs/mcp-mashup/pkg/config"
 )
 
-func TestSanitizeToolName(t *testing.T) {
+func TestSanitizeName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -43,9 +43,9 @@ func TestSanitizeToolName(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := sanitizeToolName(tt.input)
+			result := sanitizeName(tt.input)
 			if result != tt.expected {
-				t.Errorf("sanitizeToolName(%q) = %q, want %q", tt.input, result, tt.expected)
+				t.Errorf("sanitizeName(%q) = %q, want %q", tt.input, result, tt.expected)
 			}
 		})
 	}
@@ -101,7 +101,7 @@ func TestToolNameSanitization(t *testing.T) {
 
 	// Verify sanitization
 	for _, tt := range testTools {
-		result := sanitizeToolName(tt.originalName)
+		result := sanitizeName(tt.originalName)
 		if result != tt.sanitizedName {
 			t.Errorf("sanitizeToolName(%q) = %q, want %q", tt.originalName, result, tt.sanitizedName)
 		}

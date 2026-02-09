@@ -2,11 +2,7 @@ package aggregator
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -17,7 +13,8 @@ import (
 	"github.com/mightycogs/mcp-mashup/pkg/logger"
 )
 
-// MCPClient is an interface that matches the methods we use from StdioMCPClient
+var Version = "dev"
+
 type MCPClient interface {
 	Initialize(ctx context.Context, request mcp.InitializeRequest) (*mcp.InitializeResult, error)
 	ListTools(ctx context.Context, request mcp.ListToolsRequest) (*mcp.ListToolsResult, error)
@@ -25,7 +22,6 @@ type MCPClient interface {
 	Close() error
 }
 
-// MCPAggregator is responsible for aggregating multiple MCP servers
 type MCPAggregator struct {
 	clients map[string]MCPClient
 	tools   map[string]toolMapping
@@ -37,20 +33,13 @@ type toolMapping struct {
 	serverName    string
 	originalName  string
 	sanitizedName string
+	tool          mcp.Tool
 }
 
-// sanitizeToolName replaces dashes with underscores in a tool name to make it compatible with Cursor
-func sanitizeToolName(name string) string {
+func sanitizeName(name string) string {
 	return strings.ReplaceAll(name, "-", "_")
 }
 
-// normalizeToolName normalizes a tool name by replacing both dashes and underscores with underscores
-func normalizeToolName(name string) string {
-	name = strings.ReplaceAll(name, "-", "_")
-	return name
-}
-
-// NewMCPAggregator creates a new MCPAggregator
 func NewMCPAggregator() *MCPAggregator {
 	return &MCPAggregator{
 		clients: make(map[string]MCPClient),
@@ -59,73 +48,20 @@ func NewMCPAggregator() *MCPAggregator {
 	}
 }
 
-// Initialize initializes connections to all configured MCP servers
 func (a *MCPAggregator) Initialize(ctx context.Context, cfg *config.Config) error {
-	// Initialize logger with config
-	if err := logger.Init(cfg.LogLevel, cfg.LogFile); err != nil {
-		return fmt.Errorf("failed to initialize logger: %w", err)
-	}
-
-	// Override the os.Stdout during initialization to redirect it to stderr
-	// This prevents any subprocess output from corrupting our JSON stdout
-	oldStdout := os.Stdout
-
-	// Create a pipe to capture any potential stdout output from subprocesses
-	r, w, err := os.Pipe()
-	if err != nil {
-		return fmt.Errorf("failed to create output pipe: %w", err)
-	}
-
-	// Replace stdout with our pipe temporarily
-	os.Stdout = w
-
-	// Start a goroutine to read from the pipe and write to stderr
-	go func() {
-		defer r.Close()
-		buffer := make([]byte, 1024)
-		for {
-			n, err := r.Read(buffer)
-			if err != nil {
-				if !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.EOF) {
-					logger.Error("Error reading subprocess output: %v", err)
-				}
-				break
-			}
-			if n > 0 {
-				// Write subprocess output to stderr instead of stdout
-				os.Stderr.Write(buffer[:n])
-			}
-		}
-	}()
-
-	// Make sure we restore stdout when we're done
-	defer func() {
-		w.Close()
-		os.Stdout = oldStdout
-	}()
-
 	for _, serverCfg := range cfg.Servers {
-		// Store server config for filtering
 		a.mu.Lock()
 		a.configs[serverCfg.Name] = &serverCfg
 		a.mu.Unlock()
 
-		// Convert environment variables to string array format
 		var envVars []string
 		for key, value := range serverCfg.Env {
 			envVars = append(envVars, key+"="+value)
 		}
 
-		// Debug output to file only
 		logger.Debug("Initializing MCP server %s with command: %s %v", serverCfg.Name, serverCfg.Command, serverCfg.Args)
 		logger.Debug("Environment variables: %v", envVars)
 
-		// Create an exec.Cmd manually to control stderr redirection
-		cmd := exec.Command(serverCfg.Command, serverCfg.Args...)
-		cmd.Stderr = os.Stderr // Redirect stderr to stderr
-		cmd.Env = append(os.Environ(), envVars...)
-
-		// Create client
 		mcpClient, err := client.NewStdioMCPClient(
 			serverCfg.Command,
 			envVars,
@@ -136,55 +72,46 @@ func (a *MCPAggregator) Initialize(ctx context.Context, cfg *config.Config) erro
 			return fmt.Errorf("failed to create client for server %s: %w", serverCfg.Name, err)
 		}
 
-		// Initialize the client with longer timeout for NPM packages
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, 60*time.Second)
-		defer cancel()
 
-		// Initialize the client
 		initRequest := mcp.InitializeRequest{}
 		initRequest.Params.ProtocolVersion = mcp.LATEST_PROTOCOL_VERSION
 		initRequest.Params.ClientInfo = mcp.Implementation{
 			Name:    "mcp-mashup",
-			Version: "1.0.0",
+			Version: Version,
 		}
 
 		logger.Debug("Sending initialize request to %s...", serverCfg.Name)
 		initResult, err := mcpClient.Initialize(ctxWithTimeout, initRequest)
+		cancel()
 		if err != nil {
 			mcpClient.Close()
 			logger.Error("Failed to initialize server %s: %v", serverCfg.Name, err)
 
-			// Check if this is a context cancellation or deadline exceeded error
-			// We want to handle these more gracefully
 			if ctxWithTimeout.Err() != nil || strings.Contains(err.Error(), "context") {
 				logger.Error("Context error for server %s: %v", serverCfg.Name, err)
 				logger.Error("Skipping server %s", serverCfg.Name)
-				continue // Skip this server but continue with others
+				continue
 			}
 
-			// For other errors, we'll continue with other servers but log the error
 			logger.Error("Error initializing server %s: %v", serverCfg.Name, err)
 			logger.Error("Continuing with other servers...")
 			continue
 		}
 		logger.Info("Server %s initialized: %s %s", serverCfg.Name, initResult.ServerInfo.Name, initResult.ServerInfo.Version)
 
-		// Store the client
 		a.mu.Lock()
 		a.clients[serverCfg.Name] = mcpClient
 		a.mu.Unlock()
 
-		// Discover tools and register them with prefix
 		err = a.discoverTools(ctx, serverCfg.Name)
 		if err != nil {
 			logger.Error("Failed to discover tools for server %s: %v", serverCfg.Name, err)
-			// Continue with other servers even if tool discovery fails
 			logger.Error("Continuing with other servers...")
 			continue
 		}
 	}
 
-	// Check if we have at least one server initialized
 	if len(a.clients) == 0 {
 		return fmt.Errorf("no servers were successfully initialized")
 	}
@@ -192,7 +119,6 @@ func (a *MCPAggregator) Initialize(ctx context.Context, cfg *config.Config) erro
 	return nil
 }
 
-// discoverTools discovers all tools available on a server and registers them with a prefix
 func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) error {
 	a.mu.RLock()
 	mcpClient, exists := a.clients[serverName]
@@ -203,7 +129,6 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 		return fmt.Errorf("client for server %s not found", serverName)
 	}
 
-	// Get tools using list method
 	logger.Debug("Discovering tools for server %s...", serverName)
 	toolsResp, err := mcpClient.ListTools(ctx, mcp.ListToolsRequest{})
 	if err != nil {
@@ -211,16 +136,14 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 	}
 	logger.Debug("Found %d tools for server %s", len(toolsResp.Tools), serverName)
 
-	// Create a map of allowed tools for faster lookup
 	allowedTools := make(map[string]bool)
 	if serverConfig != nil && serverConfig.Tools != nil {
 		logger.Debug("Tool filtering enabled for server %s", serverName)
 		for _, tool := range serverConfig.Tools.Allowed {
-			normalizedName := normalizeToolName(tool)
+			normalizedName := sanitizeName(tool)
 			logger.Debug("Adding allowed tool: %s (normalized: %s)", tool, normalizedName)
 			allowedTools[normalizedName] = true
 		}
-		// If Tools config exists but allowed list is empty, no tools should be exposed
 		if len(serverConfig.Tools.Allowed) == 0 {
 			logger.Debug("Empty allowed tools list for server %s, no tools will be exposed", serverName)
 			return nil
@@ -229,15 +152,13 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 		logger.Debug("No tool filtering configured for server %s", serverName)
 	}
 
-	// Register each tool with a prefix
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	sanitizedServerName := sanitizeToolName(serverName)
+	sanitizedServerName := sanitizeName(serverName)
 	for _, tool := range toolsResp.Tools {
-		// Skip if tool filtering is enabled and tool is not in allowed list
 		if len(allowedTools) > 0 {
-			normalizedName := normalizeToolName(tool.Name)
+			normalizedName := sanitizeName(tool.Name)
 			if !allowedTools[normalizedName] {
 				logger.Debug("Skipping tool %s (normalized: %s) as it's not in allowed list for server %s", tool.Name, normalizedName, serverName)
 				continue
@@ -246,7 +167,7 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 		}
 
 		originalName := tool.Name
-		sanitizedName := sanitizeToolName(originalName)
+		sanitizedName := sanitizeName(originalName)
 		prefixedName := fmt.Sprintf("%s_%s", sanitizedServerName, sanitizedName)
 
 		logger.Debug("Registering tool: %s -> %s (sanitized from: %s)", originalName, prefixedName, tool.Name)
@@ -255,55 +176,26 @@ func (a *MCPAggregator) discoverTools(ctx context.Context, serverName string) er
 			serverName:    serverName,
 			originalName:  originalName,
 			sanitizedName: sanitizedName,
+			tool:          tool,
 		}
 	}
 
 	return nil
 }
 
-// GetTools returns a list of all tools from all servers with prefixed names
 func (a *MCPAggregator) GetTools() []mcp.Tool {
 	a.mu.RLock()
 	defer a.mu.RUnlock()
 
-	// Get tools from all servers
 	var allTools []mcp.Tool
 	for prefixedName, mapping := range a.tools {
-		mcpClient := a.clients[mapping.serverName]
-
-		// Get the original tool schema using ListTools
-		toolsResp, err := mcpClient.ListTools(context.Background(), mcp.ListToolsRequest{})
-		if err != nil {
-			// Skip tools that can't be retrieved
-			logger.Error("Error getting tools for %s: %v", mapping.serverName, err)
-			continue
-		}
-
-		// Find the specific tool
-		var tool mcp.Tool
-		found := false
-		for _, t := range toolsResp.Tools {
-			if t.Name == mapping.originalName {
-				tool = t
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			logger.Debug("Tool %s not found in server %s", mapping.originalName, mapping.serverName)
-			continue
-		}
-
-		// Create a new tool with the prefixed name (with underscores instead of dashes)
+		tool := mapping.tool
 		tool.Name = prefixedName
 
-		// Update the description to indicate the source server
 		if tool.Description != "" {
 			tool.Description = fmt.Sprintf("[%s] %s", mapping.serverName, tool.Description)
 		}
 
-		// Ensure the tool has a valid input schema for Cursor
 		ensureValidToolSchema(&tool)
 
 		allTools = append(allTools, tool)
@@ -312,20 +204,16 @@ func (a *MCPAggregator) GetTools() []mcp.Tool {
 	return allTools
 }
 
-// ensureValidToolSchema ensures the tool's input schema is in a format Cursor expects
 func ensureValidToolSchema(tool *mcp.Tool) {
-	// Ensure the input schema has required fields
 	if tool.InputSchema.Type == "" {
 		tool.InputSchema.Type = "object"
 	}
 
-	// Ensure properties field exists and is initialized
 	if tool.InputSchema.Properties == nil {
 		tool.InputSchema.Properties = make(map[string]interface{})
 	}
 }
 
-// CallTool calls a tool on the appropriate server
 func (a *MCPAggregator) CallTool(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	a.mu.RLock()
 	prefixedName := request.Params.Name
@@ -343,15 +231,12 @@ func (a *MCPAggregator) CallTool(ctx context.Context, request mcp.CallToolReques
 
 	logger.Debug("Calling tool %s on server %s (mapped from %s)", mapping.originalName, mapping.serverName, prefixedName)
 
-	// Create a new request with the original tool name (without prefix and with original dashes)
 	newRequest := request
 	newRequest.Params.Name = mapping.originalName
 
-	// Call the tool on the appropriate server
 	return mcpClient.CallTool(ctx, newRequest)
 }
 
-// Close closes all client connections
 func (a *MCPAggregator) Close() {
 	a.mu.Lock()
 	defer a.mu.Unlock()

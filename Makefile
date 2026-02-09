@@ -1,5 +1,8 @@
 .PHONY: help build test clean run install
 
+VERSION=$(shell date +v%y.%m%d.%H%M)
+LDFLAGS=-ldflags "-X main.version=$(VERSION)"
+
 help:
 	@echo "Available targets:"
 	@echo "  build    - Build mcp-mashup binary"
@@ -10,7 +13,7 @@ help:
 
 build:
 	mkdir -p ./bin
-	go build -o ./bin/mcp-mashup ./cmd/mcp-mashup
+	go build $(LDFLAGS) -o ./bin/mcp-mashup ./cmd/mcp-mashup
 
 test:
 	go test ./...
