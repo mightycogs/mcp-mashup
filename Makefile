@@ -9,17 +9,18 @@ help:
 	@echo "  install  - Install to ~/.local/bin"
 
 build:
-	go build -o mcp-mashup ./cmd/mcp-mashup
+	mkdir -p ./bin
+	go build -o ./bin/mcp-mashup ./cmd/mcp-mashup
 
 test:
 	go test ./...
 
 clean:
-	rm -f mcp-mashup
+	rm -rf ./bin
 
 run: build
-	./mcp-mashup
+	./bin/mcp-mashup
 
 install: build
 	mkdir -p ~/.local/bin
-	cp mcp-mashup ~/.local/bin/
+	cp ./bin/mcp-mashup ~/.local/bin/
